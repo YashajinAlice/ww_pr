@@ -51,6 +51,13 @@ if (-not $Token) {
     $Token = Read-Host "請輸入 Token"
     if (-not $Token) {
         Write-Error "❌ Token 不能為空"
+        Write-Host ""
+        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        try {
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        } catch {
+            Start-Sleep -Seconds 3
+        }
         exit 1
     }
 }
@@ -59,6 +66,13 @@ if (-not $Uid) {
     $Uid = Read-Host "請輸入您的遊戲 UID"
     if (-not $Uid) {
         Write-Error "❌ UID 不能為空"
+        Write-Host ""
+        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        try {
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        } catch {
+            Start-Sleep -Seconds 3
+        }
         exit 1
     }
 }
@@ -129,6 +143,13 @@ if (-not $PythonCmd) {
     Write-Host "  2. 安裝時勾選 'Add Python to PATH'" -ForegroundColor Green
     Write-Host ""
     Write-Host "安裝完成後，請重新執行此命令" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "按任意鍵退出..." -ForegroundColor Gray
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        Start-Sleep -Seconds 5
+    }
     exit 1
 }
 
@@ -210,6 +231,13 @@ try {
     
 } catch {
     Write-Error "❌ 讀取數據庫失敗: $_"
+    Write-Host ""
+    Write-Host "按任意鍵退出..." -ForegroundColor Gray
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        Start-Sleep -Seconds 5
+    }
     exit 1
 }
 
@@ -234,6 +262,13 @@ if ($TotalEvents -eq 0) {
     $Response = Read-Host "是否仍要上傳？(y/N)"
     if ($Response -ne "y" -and $Response -ne "Y") {
         Write-Host "已取消上傳"
+        Write-Host ""
+        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        try {
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        } catch {
+            Start-Sleep -Seconds 2
+        }
         exit 0
     }
 }
@@ -260,9 +295,20 @@ try {
         Write-Host ""
         Write-Host "🎉 完成！現在可以在 Discord 使用 /遊戲統計 查看數據" -ForegroundColor Green
         Write-Host ""
+        
+        # 如果不是在交互式終端，暫停讓用戶看到結果
+        if (-not [Environment]::UserInteractive) {
+            Write-Host "按任意鍵退出..." -ForegroundColor Gray
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        }
         exit 0
     } else {
         Write-Error "❌ 上傳失敗: $($Response.msg)"
+        
+        # 暫停讓用戶看到錯誤
+        Write-Host ""
+        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         exit 1
     }
     
@@ -277,6 +323,16 @@ try {
         } catch {
             Write-Error "   響應: $($_.Exception.Message)"
         }
+    }
+    
+    # 暫停讓用戶看到錯誤
+    Write-Host ""
+    Write-Host "按任意鍵退出..." -ForegroundColor Gray
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        # 如果無法讀取按鍵（非交互式終端），等待幾秒
+        Start-Sleep -Seconds 5
     }
     exit 1
 }
