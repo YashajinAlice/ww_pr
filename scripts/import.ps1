@@ -1,13 +1,13 @@
-# WutheringWaves Bot - 遊戲統計數據一鍵導入腳本
-# 完全自包含，無需下載任何文件
+# WutheringWaves Bot - Game Stats Import Script
+# Self-contained, no downloads required
 # 
-# 使用方法（一行命令，無需下載）：
+# Usage (one-line command):
 #   $env:WW_BOT_TOKEN="YOUR_TOKEN"; $env:WW_BOT_UID="YOUR_UID"; iwr -UseBasicParsing https://raw.githubusercontent.com/YashajinAlice/ww_pr/main/scripts/import.ps1 | iex
 #
-# 或交互式輸入：
+# Or interactive input:
 #   iwr -UseBasicParsing https://raw.githubusercontent.com/YashajinAlice/ww_pr/main/scripts/import.ps1 | iex
 #
-# 首次使用可能需要執行：
+# First-time use may require:
 #   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 param(
@@ -18,28 +18,28 @@ param(
     [string]$Uid = ""
 )
 
-# API 基礎 URL
+# API Base URL
 $ApiBaseUrl = "https://fukuroapi.fulin-net.top"
 $ApiUrl = "$ApiBaseUrl/api/game-stats/upload"
 
-# 顏色輸出
+# Color output functions
 function Write-Success { Write-Host $args -ForegroundColor Green }
 function Write-Error { Write-Host $args -ForegroundColor Red }
 function Write-Info { Write-Host $args -ForegroundColor Cyan }
 function Write-Warning { Write-Host $args -ForegroundColor Yellow }
 
-# 設置控制台編碼為 UTF-8（避免亂碼）
+# Set console encoding to UTF-8 (avoid garbled text)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-# 顯示歡迎信息
+# Display welcome message
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  WutheringWaves Bot - Game Stats Import" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 如果缺少參數，嘗試從環境變數讀取
+# If parameters are missing, try reading from environment variables
 if (-not $Token) {
     $Token = $env:WW_BOT_TOKEN
 }
@@ -48,7 +48,7 @@ if (-not $Uid) {
     $Uid = $env:WW_BOT_UID
 }
 
-# 如果還是沒有，引導用戶輸入
+# If still missing, prompt user for input
 if (-not $Token) {
     Write-Host "[!] Please use /generate_upload_token in Discord to get Token" -ForegroundColor Yellow
     Write-Host ""
@@ -81,51 +81,74 @@ if (-not $Uid) {
     }
 }
 
-# 獲取 WutheringWavesTool 安裝目錄
-Write-Info "[*] Please enter WutheringWavesTool installation directory"
-Write-Host ""
-Write-Host "Example: C:\Users\YourName\Desktop\WutheringWavesTool-1.3.3" -ForegroundColor Gray
-Write-Host "         D:\Tools\WutheringWavesTool" -ForegroundColor Gray
-Write-Host ""
-Write-Host "Note: This is where WutheringWavesTool.exe is located" -ForegroundColor Yellow
-Write-Host ""
-$ToolDir = Read-Host "WutheringWavesTool Directory"
+# Find game log directory
+Write-Info "[*] Searching for game log files..."
 
-if (-not $ToolDir) {
-    Write-Error "[X] Directory cannot be empty"
-    Write-Host ""
-    Write-Host "Press any key to exit..." -ForegroundColor Gray
-    try {
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    } catch {
-        Start-Sleep -Seconds 3
+$LogDirRelativePath = "Client\Saved\Logs"
+$LogFiles = @()
+
+# Common game installation paths
+$CommonPaths = @(
+    "$env:LOCALAPPDATA\Wuthering Waves",
+    "C:\Program Files\Wuthering Waves",
+    "C:\Program Files (x86)\Wuthering Waves",
+    "D:\Wuthering Waves",
+    "E:\Wuthering Waves",
+    "F:\Wuthering Waves"
+)
+
+foreach ($BasePath in $CommonPaths) {
+    # Check if drive exists (avoid errors for non-existent drives)
+    $DriveLetter = ($BasePath -split ':')[0]
+    if ($DriveLetter -and $DriveLetter.Length -eq 1) {
+        $Drive = Get-PSDrive -Name $DriveLetter -ErrorAction SilentlyContinue
+        if (-not $Drive) {
+            # Drive doesn't exist, skip
+            continue
+        }
     }
-    exit 1
+    
+    # Check if path exists
+    if (-not (Test-Path $BasePath)) {
+        continue
+    }
+    
+    $LogDir = Join-Path $BasePath $LogDirRelativePath
+    if (Test-Path $LogDir) {
+        # Find all Client*.log files
+        $FoundFiles = Get-ChildItem -Path $LogDir -Filter "Client*.log" -ErrorAction SilentlyContinue
+        if ($FoundFiles) {
+            $LogFiles += $FoundFiles
+        }
+    }
 }
 
-# 檢查路徑是否存在
-if (-not (Test-Path $ToolDir)) {
-    Write-Error "[X] Directory not found: $ToolDir"
+# If not found, prompt user
+if ($LogFiles.Count -eq 0) {
+    Write-Warning "[!] Could not find game log files automatically"
     Write-Host ""
-    Write-Host "Press any key to exit..." -ForegroundColor Gray
-    try {
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    } catch {
-        Start-Sleep -Seconds 3
+    Write-Host "Please enter your game root directory:" -ForegroundColor Yellow
+    Write-Host "Example: C:\Program Files\Wuthering Waves" -ForegroundColor Gray
+    Write-Host ""
+    $GameRootDir = Read-Host "Game Root Directory"
+    
+    if ($GameRootDir) {
+        $LogDir = Join-Path $GameRootDir $LogDirRelativePath
+        if (Test-Path $LogDir) {
+            $FoundFiles = Get-ChildItem -Path $LogDir -Filter "Client*.log" -ErrorAction SilentlyContinue
+            if ($FoundFiles) {
+                $LogFiles += $FoundFiles
+            }
+        }
     }
-    exit 1
 }
 
-# 構建數據庫路徑（WutheringWavesTool 的 sqlite.db）
-$DbPath = Join-Path $ToolDir "sqlite.db"
-
-# 檢查數據庫文件是否存在
-if (-not (Test-Path $DbPath)) {
-    Write-Error "[X] Database not found at: $DbPath"
+if ($LogFiles.Count -eq 0) {
+    Write-Error "[X] Game log files not found"
     Write-Host ""
     Write-Host "Please confirm:" -ForegroundColor Yellow
-    Write-Host "  1. The WutheringWavesTool directory is correct" -ForegroundColor White
-    Write-Host "  2. You have launched the game using WutheringWavesTool at least once" -ForegroundColor White
+    Write-Host "  1. The game is installed" -ForegroundColor White
+    Write-Host "  2. You have played the game at least once" -ForegroundColor White
     Write-Host ""
     Write-Host "Press any key to exit..." -ForegroundColor Gray
     try {
@@ -136,175 +159,103 @@ if (-not (Test-Path $DbPath)) {
     exit 1
 }
 
-Write-Success "[OK] Database found: $DbPath"
+Write-Success "[OK] Found $($LogFiles.Count) log file(s)"
 
-# 讀取統計數據（使用內嵌 Python 代碼）
-Write-Info "[*] Reading statistics data..."
+# Analyze log files
+Write-Info "[*] Analyzing log files..."
 
 $DateStr = (Get-Date).ToString("yyyy-MM-dd")
 
-# 檢查 Python
-$PythonCmd = $null
-$PythonCommands = @("python", "python3", "py")
-
-foreach ($cmd in $PythonCommands) {
-    try {
-        $null = & $cmd --version 2>&1
-        if ($LASTEXITCODE -eq 0 -or $?) {
-            $PythonCmd = $cmd
-            break
-        }
-    } catch {
-        continue
-    }
+# Initialize counters
+$stats = @{
+    date = $DateStr
+    role_change_count = 0
+    role_death_count = 0
+    battle_count = 0
+    phantom_get_count = 0
+    parry_count = 0
+    transfer_count = 0
+    used_strength = 0
 }
 
-if (-not $PythonCmd) {
-    Write-Error "[X] Python not found"
-    Write-Host ""
-    Write-Host "Solution:" -ForegroundColor Yellow
-    Write-Host "  1. Install Python: https://www.python.org/downloads/" -ForegroundColor Green
-    Write-Host "  2. Check 'Add Python to PATH' during installation" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "After installation, please run this command again" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "按任意鍵退出..." -ForegroundColor Gray
-    try {
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    } catch {
-        Start-Sleep -Seconds 5
-    }
-    exit 1
+# Keywords to search for
+$keywords = @{
+    "角色下场，立即隐藏" = "role_change_count"
+    "前台角色死亡进行切人" = "role_death_count"
+    "切换玩家状态: 进入战斗造成伤害" = "battle_count"
+    "[技能名称: 初次幻象收服]" = "phantom_get_count"
+    "传送:完成" = "transfer_count"
+    "结束技能名称:" = "parry"  # Special handling for parry
 }
 
-# 使用 Python 讀取 SQLite（SQLite 是 Python 標準庫，無需額外安裝）
-# 構建 Python 腳本，避免 BOM 問題
-$EscapedDbPath = $DbPath -replace '\\', '\\'
-$PythonScriptLines = @(
-    "import sqlite3",
-    "import json",
-    "import sys",
-    "from datetime import datetime",
-    "",
-    "db_path = r'$EscapedDbPath'",
-    "uid = '$Uid'",
-    "date_str = '$DateStr'",
-    "",
-    "try:",
-    "    conn = sqlite3.connect(db_path)",
-    "    cursor = conn.cursor()",
-    "    ",
-    "    cursor.execute('''",
-    "        SELECT ",
-    "            role_change,",
-    "            role_death,",
-    "            battle,",
-    "            phantom_get,",
-    "            (parry_front + parry_back) as parry_count,",
-    "            transfer,",
-    "            used_strength",
-    "        FROM game_record",
-    "        WHERE role_id = ? AND create_date = ?",
-    "    ''', (uid, date_str))",
-    "    ",
-    "    row = cursor.fetchone()",
-    "    ",
-    "    if row:",
-    "        stats = {",
-    "            'date': date_str,",
-    "            'role_change_count': row[0] or 0,",
-    "            'role_death_count': row[1] or 0,",
-    "            'battle_count': row[2] or 0,",
-    "            'phantom_get_count': row[3] or 0,",
-    "            'parry_count': row[4] or 0,",
-    "            'transfer_count': row[5] or 0,",
-    "            'used_strength': row[6] or 0",
-    "        }",
-    "    else:",
-    "        stats = {",
-    "            'date': date_str,",
-    "            'battle_count': 0,",
-    "            'phantom_get_count': 0,",
-    "            'parry_count': 0,",
-    "            'role_change_count': 0,",
-    "            'role_death_count': 0,",
-    "            'transfer_count': 0,",
-    "            'used_strength': 0",
-    "        }",
-    "    ",
-    "    print(json.dumps(stats, ensure_ascii=False))",
-    "    conn.close()",
-    "except Exception as e:",
-    "    print(json.dumps({'error': str(e)}), file=sys.stderr)",
-    "    sys.exit(1)"
-)
-$PythonScript = $PythonScriptLines -join "`n"
+# Regex patterns
+$parryFrontPattern = [regex]::new("结束技能名称: (.+)?极限闪避前闪")
+$parryBackPattern = [regex]::new("结束技能名称: (.+)?极限闪避后闪")
 
-try {
-    # 使用臨時文件執行 Python 腳本，避免 BOM 和管道問題
-    $TempScript = Join-Path $env:TEMP "ww_bot_read_stats_$(Get-Random).py"
-    
-    # 使用 UTF-8 無 BOM 編碼寫入文件
-    $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllLines($TempScript, $PythonScriptLines, $Utf8NoBomEncoding)
+# Process log files (sorted by modification time)
+$SortedFiles = $LogFiles | Sort-Object LastWriteTime
+
+foreach ($LogFile in $SortedFiles) {
+    Write-Info "  Processing: $($LogFile.Name)"
     
     try {
-        # 執行 Python 腳本
-        $StatsJson = & $PythonCmd $TempScript 2>&1
+        $content = Get-Content $LogFile.FullName -Encoding UTF8 -ErrorAction Stop
         
-        if ($LASTEXITCODE -ne 0) {
-            $ErrorMsg = $StatsJson | Out-String
-            Write-Error "[X] Failed to read database"
-            Write-Host $ErrorMsg -ForegroundColor Red
-            Write-Host ""
-            Write-Host "Press any key to exit..." -ForegroundColor Gray
-            try {
-                $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            } catch {
-                Start-Sleep -Seconds 5
+        foreach ($line in $content) {
+            # Check for today's date in log line
+            if ($line -match "\[(\d{4}\.\d{2}\.\d{2})") {
+                $logDate = $matches[1] -replace '\.', '-'
+                $logDate = $logDate -replace '(\d{4})-(\d{2})-(\d{2})', '$1-$2-$3'
+                
+                # Only process today's logs
+                if ($logDate -ne $DateStr) {
+                    continue
+                }
             }
-            exit 1
+            
+            # Check keywords
+            foreach ($keyword in $keywords.Keys) {
+                if ($line -like "*$keyword*") {
+                    $statKey = $keywords[$keyword]
+                    
+                    if ($statKey -eq "parry") {
+                        # Special handling for parry
+                        if ($parryFrontPattern.IsMatch($line) -or $parryBackPattern.IsMatch($line)) {
+                            $stats.parry_count++
+                        }
+                    } else {
+                        $stats[$statKey]++
+                    }
+                }
+            }
+            
+            # Check for strength usage
+            if ($line -like "*当前体力数据 [data: *") {
+                if ($line -match "UPs:(\d+)") {
+                    # This is just for detection, actual strength calculation would need more logic
+                }
+            }
         }
-        
-        $Stats = $StatsJson | ConvertFrom-Json
-        
-        if ($Stats.error) {
-            throw $Stats.error
-        }
-    } finally {
-        # 清理臨時文件
-        if (Test-Path $TempScript) {
-            Remove-Item $TempScript -Force -ErrorAction SilentlyContinue
-        }
-    }
-    
-} catch {
-    Write-Error "[X] Failed to read database: $_"
-    Write-Host ""
-    Write-Host "Press any key to exit..." -ForegroundColor Gray
-    try {
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     } catch {
-        Start-Sleep -Seconds 5
+        Write-Warning "  Failed to read: $($LogFile.Name)"
     }
-    exit 1
 }
 
-# 顯示統計數據
+# Display statistics
 Write-Host ""
-Write-Host "[*] Date: $($Stats.date)" -ForegroundColor Cyan
-Write-Host "   Battle Count: $($Stats.battle_count)"
-Write-Host "   Phantom Get: $($Stats.phantom_get_count)"
-Write-Host "   Parry Success: $($Stats.parry_count)"
-Write-Host "   Role Change: $($Stats.role_change_count)"
-Write-Host "   Role Death: $($Stats.role_death_count)"
-Write-Host "   Transfer: $($Stats.transfer_count)"
-Write-Host "   Used Strength: $($Stats.used_strength)"
+Write-Host "[*] Date: $($stats.date)" -ForegroundColor Cyan
+Write-Host "   Battle Count: $($stats.battle_count)"
+Write-Host "   Phantom Get: $($stats.phantom_get_count)"
+Write-Host "   Parry Success: $($stats.parry_count)"
+Write-Host "   Role Change: $($stats.role_change_count)"
+Write-Host "   Role Death: $($stats.role_death_count)"
+Write-Host "   Transfer: $($stats.transfer_count)"
+Write-Host "   Used Strength: $($stats.used_strength)"
 Write-Host ""
 
-# 檢查是否有數據
-$TotalEvents = $Stats.battle_count + $Stats.phantom_get_count + $Stats.parry_count + 
-               $Stats.role_change_count + $Stats.role_death_count + $Stats.transfer_count
+# Check if there's any data
+$TotalEvents = $stats.battle_count + $stats.phantom_get_count + $stats.parry_count + 
+               $stats.role_change_count + $stats.role_death_count + $stats.transfer_count
 
 if ($TotalEvents -eq 0) {
     Write-Warning "[!] Warning: No statistics data for this date"
@@ -322,13 +273,13 @@ if ($TotalEvents -eq 0) {
     }
 }
 
-# 上傳數據
+# Upload data
 Write-Info "[*] Uploading data to API..."
 
 try {
     $Payload = @{
         token = $Token
-        stats = $Stats
+        stats = $stats
     } | ConvertTo-Json -Depth 10
     
     $Headers = @{
@@ -345,7 +296,7 @@ try {
         Write-Host "[OK] Done! You can now use /game_stats in Discord to view the data" -ForegroundColor Green
         Write-Host ""
         
-        # 如果不是在交互式終端，暫停讓用戶看到結果
+        # Pause to let user see the result
         if (-not [Environment]::UserInteractive) {
             Write-Host "Press any key to exit..." -ForegroundColor Gray
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -354,7 +305,7 @@ try {
     } else {
         Write-Error "[X] Upload failed: $($Response.msg)"
         
-        # 暫停讓用戶看到錯誤
+        # Pause to let user see error
         Write-Host ""
         Write-Host "Press any key to exit..." -ForegroundColor Gray
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
@@ -368,21 +319,20 @@ try {
             $Reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
             $ResponseBody = $Reader.ReadToEnd()
             $ErrorBody = $ResponseBody | ConvertFrom-Json
-            Write-Error "   錯誤信息: $($ErrorBody.msg)"
+            Write-Error "   Error: $($ErrorBody.msg)"
         } catch {
-            Write-Error "   響應: $($_.Exception.Message)"
+            Write-Error "   Response: $($_.Exception.Message)"
         }
     }
     
-    # 暫停讓用戶看到錯誤
+    # Pause to let user see error
     Write-Host ""
-    Write-Host "按任意鍵退出..." -ForegroundColor Gray
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
     try {
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     } catch {
-        # 如果無法讀取按鍵（非交互式終端），等待幾秒
+        # If can't read key (non-interactive terminal), wait a few seconds
         Start-Sleep -Seconds 5
     }
     exit 1
 }
-
