@@ -188,9 +188,9 @@ $keywords = @{
     "结束技能名称:" = "parry"  # Special handling for parry
 }
 
-# Regex patterns
-$parryFrontPattern = [regex]::new("结束技能名称: (.+)?极限闪避前闪")
-$parryBackPattern = [regex]::new("结束技能名称: (.+)?极限闪避后闪")
+# Regex patterns for parry (using escaped patterns)
+$parryFrontPattern = [regex]::new("结束技能名称:.*极限闪避前闪")
+$parryBackPattern = [regex]::new("结束技能名称:.*极限闪避后闪")
 
 # Process log files (sorted by modification time)
 $SortedFiles = $LogFiles | Sort-Object LastWriteTime
@@ -199,18 +199,47 @@ foreach ($LogFile in $SortedFiles) {
     Write-Info "  Processing: $($LogFile.Name)"
     
     try {
-        $content = Get-Content $LogFile.FullName -Encoding UTF8 -ErrorAction Stop
+        # Try different encodings
+        $content = $null
+        $encodings = @([System.Text.Encoding]::UTF8, [System.Text.Encoding]::Default)
+        
+        foreach ($encoding in $encodings) {
+            try {
+                $content = [System.IO.File]::ReadAllLines($LogFile.FullName, $encoding)
+                break
+            } catch {
+                continue
+            }
+        }
+        
+        if ($null -eq $content) {
+            Write-Warning "  Failed to read: $($LogFile.Name) (encoding issue)"
+            continue
+        }
+        
+        $fileHasTodayData = $false
         
         foreach ($line in $content) {
             # Check for today's date in log line
-            if ($line -match "\[(\d{4}\.\d{2}\.\d{2})") {
-                $logDate = $matches[1] -replace '\.', '-'
-                $logDate = $logDate -replace '(\d{4})-(\d{2})-(\d{2})', '$1-$2-$3'
+            if ($line -match "\[(\d{4})\.(\d{2})\.(\d{2})") {
+                $year = $matches[1]
+                $month = $matches[2]
+                $day = $matches[3]
+                $logDate = "$year-$month-$day"
                 
                 # Only process today's logs
-                if ($logDate -ne $DateStr) {
+                if ($logDate -eq $DateStr) {
+                    $fileHasTodayData = $true
+                } elseif ($fileHasTodayData) {
+                    # Already processed today's data, skip rest
+                    break
+                } else {
+                    # Not today's data, skip this line
                     continue
                 }
+            } elseif (-not $fileHasTodayData) {
+                # No date found yet, skip
+                continue
             }
             
             # Check keywords
@@ -219,8 +248,8 @@ foreach ($LogFile in $SortedFiles) {
                     $statKey = $keywords[$keyword]
                     
                     if ($statKey -eq "parry") {
-                        # Special handling for parry
-                        if ($parryFrontPattern.IsMatch($line) -or $parryBackPattern.IsMatch($line)) {
+                        # Special handling for parry - check if line contains parry keywords
+                        if ($line -match "极限闪避前闪" -or $line -match "极限闪避后闪") {
                             $stats.parry_count++
                         }
                     } else {
@@ -314,15 +343,29 @@ try {
     
 } catch {
     Write-Error "[X] Upload failed: $_"
+    
+    # Check if it's a 404 error
     if ($_.Exception.Response) {
-        try {
-            $Reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-            $ResponseBody = $Reader.ReadToEnd()
-            $ErrorBody = $ResponseBody | ConvertFrom-Json
-            Write-Error "   Error: $($ErrorBody.msg)"
-        } catch {
-            Write-Error "   Response: $($_.Exception.Message)"
+        $StatusCode = $_.Exception.Response.StatusCode.value__
+        if ($StatusCode -eq 404) {
+            Write-Error "   404 Not Found - API endpoint may not exist or bot is not running"
+            Write-Host ""
+            Write-Host "Please check:" -ForegroundColor Yellow
+            Write-Host "  1. The bot is running" -ForegroundColor White
+            Write-Host "  2. The API endpoint is correct: $ApiUrl" -ForegroundColor White
+            Write-Host "  3. The token is valid (generate a new one if needed)" -ForegroundColor White
+        } else {
+            try {
+                $Reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $ResponseBody = $Reader.ReadToEnd()
+                $ErrorBody = $ResponseBody | ConvertFrom-Json
+                Write-Error "   Error: $($ErrorBody.msg)"
+            } catch {
+                Write-Error "   Response: $($_.Exception.Message)"
+            }
         }
+    } else {
+        Write-Error "   Network error or API endpoint not reachable"
     }
     
     # Pause to let user see error
