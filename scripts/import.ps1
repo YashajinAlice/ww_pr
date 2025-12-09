@@ -240,25 +240,47 @@ $PythonScriptLines = @(
 $PythonScript = $PythonScriptLines -join "`n"
 
 try {
-    $StatsJson = $PythonScript | & $PythonCmd 2>&1
+    # 使用臨時文件執行 Python 腳本，避免 BOM 和管道問題
+    $TempScript = Join-Path $env:TEMP "ww_bot_read_stats_$(Get-Random).py"
     
-    if ($LASTEXITCODE -ne 0) {
-        $ErrorMsg = $StatsJson | Out-String
-        Write-Error "❌ 讀取數據庫失敗"
-        Write-Host $ErrorMsg -ForegroundColor Red
-        exit 1
-    }
+    # 使用 UTF-8 無 BOM 編碼寫入文件
+    $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllLines($TempScript, $PythonScriptLines, $Utf8NoBomEncoding)
     
-    $Stats = $StatsJson | ConvertFrom-Json
-    
-    if ($Stats.error) {
-        throw $Stats.error
+    try {
+        # 執行 Python 腳本
+        $StatsJson = & $PythonCmd $TempScript 2>&1
+        
+        if ($LASTEXITCODE -ne 0) {
+            $ErrorMsg = $StatsJson | Out-String
+            Write-Error "[X] Failed to read database"
+            Write-Host $ErrorMsg -ForegroundColor Red
+            Write-Host ""
+            Write-Host "Press any key to exit..." -ForegroundColor Gray
+            try {
+                $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            } catch {
+                Start-Sleep -Seconds 5
+            }
+            exit 1
+        }
+        
+        $Stats = $StatsJson | ConvertFrom-Json
+        
+        if ($Stats.error) {
+            throw $Stats.error
+        }
+    } finally {
+        # 清理臨時文件
+        if (Test-Path $TempScript) {
+            Remove-Item $TempScript -Force -ErrorAction SilentlyContinue
+        }
     }
     
 } catch {
     Write-Error "[X] Failed to read database: $_"
     Write-Host ""
-    Write-Host "按任意鍵退出..." -ForegroundColor Gray
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
     try {
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     } catch {
