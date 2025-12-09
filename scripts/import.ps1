@@ -177,64 +177,67 @@ if (-not $PythonCmd) {
 }
 
 # 使用 Python 讀取 SQLite（SQLite 是 Python 標準庫，無需額外安裝）
-$PythonScript = @"
-import sqlite3
-import json
-import sys
-from datetime import datetime
-
-db_path = r'$($DbPath -replace '\\', '\\')'
-uid = '$Uid'
-date_str = '$DateStr'
-
-try:
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT 
-            role_change,
-            role_death,
-            battle,
-            phantom_get,
-            (parry_front + parry_back) as parry_count,
-            transfer,
-            used_strength
-        FROM game_record
-        WHERE role_id = ? AND create_date = ?
-    ''', (uid, date_str))
-    
-    row = cursor.fetchone()
-    
-    if row:
-        stats = {
-            'date': date_str,
-            'role_change_count': row[0] or 0,
-            'role_death_count': row[1] or 0,
-            'battle_count': row[2] or 0,
-            'phantom_get_count': row[3] or 0,
-            'parry_count': row[4] or 0,
-            'transfer_count': row[5] or 0,
-            'used_strength': row[6] or 0
-        }
-    else:
-        stats = {
-            'date': date_str,
-            'battle_count': 0,
-            'phantom_get_count': 0,
-            'parry_count': 0,
-            'role_change_count': 0,
-            'role_death_count': 0,
-            'transfer_count': 0,
-            'used_strength': 0
-        }
-    
-    print(json.dumps(stats, ensure_ascii=False))
-    conn.close()
-except Exception as e:
-    print(json.dumps({'error': str(e)}), file=sys.stderr)
-    sys.exit(1)
-"@
+# 構建 Python 腳本，避免 BOM 問題
+$EscapedDbPath = $DbPath -replace '\\', '\\'
+$PythonScriptLines = @(
+    "import sqlite3",
+    "import json",
+    "import sys",
+    "from datetime import datetime",
+    "",
+    "db_path = r'$EscapedDbPath'",
+    "uid = '$Uid'",
+    "date_str = '$DateStr'",
+    "",
+    "try:",
+    "    conn = sqlite3.connect(db_path)",
+    "    cursor = conn.cursor()",
+    "    ",
+    "    cursor.execute('''",
+    "        SELECT ",
+    "            role_change,",
+    "            role_death,",
+    "            battle,",
+    "            phantom_get,",
+    "            (parry_front + parry_back) as parry_count,",
+    "            transfer,",
+    "            used_strength",
+    "        FROM game_record",
+    "        WHERE role_id = ? AND create_date = ?",
+    "    ''', (uid, date_str))",
+    "    ",
+    "    row = cursor.fetchone()",
+    "    ",
+    "    if row:",
+    "        stats = {",
+    "            'date': date_str,",
+    "            'role_change_count': row[0] or 0,",
+    "            'role_death_count': row[1] or 0,",
+    "            'battle_count': row[2] or 0,",
+    "            'phantom_get_count': row[3] or 0,",
+    "            'parry_count': row[4] or 0,",
+    "            'transfer_count': row[5] or 0,",
+    "            'used_strength': row[6] or 0",
+    "        }",
+    "    else:",
+    "        stats = {",
+    "            'date': date_str,",
+    "            'battle_count': 0,",
+    "            'phantom_get_count': 0,",
+    "            'parry_count': 0,",
+    "            'role_change_count': 0,",
+    "            'role_death_count': 0,",
+    "            'transfer_count': 0,",
+    "            'used_strength': 0",
+    "        }",
+    "    ",
+    "    print(json.dumps(stats, ensure_ascii=False))",
+    "    conn.close()",
+    "except Exception as e:",
+    "    print(json.dumps({'error': str(e)}), file=sys.stderr)",
+    "    sys.exit(1)"
+)
+$PythonScript = $PythonScriptLines -join "`n"
 
 try {
     $StatsJson = $PythonScript | & $PythonCmd 2>&1
