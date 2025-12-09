@@ -28,10 +28,14 @@ function Write-Error { Write-Host $args -ForegroundColor Red }
 function Write-Info { Write-Host $args -ForegroundColor Cyan }
 function Write-Warning { Write-Host $args -ForegroundColor Yellow }
 
+# 設置控制台編碼為 UTF-8（避免亂碼）
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # 顯示歡迎信息
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  WutheringWaves Bot - 遊戲統計導入" -ForegroundColor Cyan
+Write-Host "  WutheringWaves Bot - Game Stats Import" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -46,13 +50,13 @@ if (-not $Uid) {
 
 # 如果還是沒有，引導用戶輸入
 if (-not $Token) {
-    Write-Host "📝 請在 Discord 使用 /生成上傳令牌 獲取 Token" -ForegroundColor Yellow
+    Write-Host "[!] Please use /generate_upload_token in Discord to get Token" -ForegroundColor Yellow
     Write-Host ""
-    $Token = Read-Host "請輸入 Token"
+    $Token = Read-Host "Enter Token"
     if (-not $Token) {
-        Write-Error "❌ Token 不能為空"
+        Write-Error "[X] Token cannot be empty"
         Write-Host ""
-        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        Write-Host "Press any key to exit..." -ForegroundColor Gray
         try {
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         } catch {
@@ -63,11 +67,11 @@ if (-not $Token) {
 }
 
 if (-not $Uid) {
-    $Uid = Read-Host "請輸入您的遊戲 UID"
+    $Uid = Read-Host "Enter your Game UID"
     if (-not $Uid) {
-        Write-Error "❌ UID 不能為空"
+        Write-Error "[X] UID cannot be empty"
         Write-Host ""
-        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        Write-Host "Press any key to exit..." -ForegroundColor Gray
         try {
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         } catch {
@@ -78,7 +82,7 @@ if (-not $Uid) {
 }
 
 # 查找遊戲數據庫
-Write-Info "🔍 正在查找遊戲數據庫..."
+Write-Info "[*] Searching for game database..."
 
 $GameDbRelativePath = "Client\Saved\LocalStorage\LocalStorage.db"
 $DbPath = $null
@@ -94,6 +98,21 @@ $CommonPaths = @(
 )
 
 foreach ($BasePath in $CommonPaths) {
+    # 檢查磁碟機是否存在（避免不存在的磁碟機報錯）
+    $DriveLetter = ($BasePath -split ':')[0]
+    if ($DriveLetter -and $DriveLetter.Length -eq 1) {
+        $Drive = Get-PSDrive -Name $DriveLetter -ErrorAction SilentlyContinue
+        if (-not $Drive) {
+            # 磁碟機不存在，跳過
+            continue
+        }
+    }
+    
+    # 檢查路徑是否存在
+    if (-not (Test-Path $BasePath)) {
+        continue
+    }
+    
     $TestPath = Join-Path $BasePath $GameDbRelativePath
     if (Test-Path $TestPath) {
         $DbPath = $TestPath
@@ -102,20 +121,20 @@ foreach ($BasePath in $CommonPaths) {
 }
 
 if (-not $DbPath) {
-    Write-Error "❌ 找不到遊戲數據庫"
+    Write-Error "[X] Game database not found"
     Write-Host ""
-    Write-Host "請確認：" -ForegroundColor Yellow
-    Write-Host "  1. 已安裝 WutheringWavesTool" -ForegroundColor White
-    Write-Host "  2. 已使用 WutheringWavesTool 啟動過遊戲" -ForegroundColor White
+    Write-Host "Please confirm:" -ForegroundColor Yellow
+    Write-Host "  1. WutheringWavesTool is installed" -ForegroundColor White
+    Write-Host "  2. You have launched the game using WutheringWavesTool" -ForegroundColor White
     Write-Host ""
-    Write-Host "如果遊戲安裝在非默認位置，請聯繫管理員" -ForegroundColor Yellow
+    Write-Host "If the game is installed in a non-default location, please contact admin" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Success "✅ 找到數據庫: $DbPath"
+Write-Success "[OK] Database found: $DbPath"
 
 # 讀取統計數據（使用內嵌 Python 代碼）
-Write-Info "📊 正在讀取統計數據..."
+Write-Info "[*] Reading statistics data..."
 
 $DateStr = (Get-Date).ToString("yyyy-MM-dd")
 
@@ -136,13 +155,13 @@ foreach ($cmd in $PythonCommands) {
 }
 
 if (-not $PythonCmd) {
-    Write-Error "❌ 未找到 Python"
+    Write-Error "[X] Python not found"
     Write-Host ""
-    Write-Host "解決方法：" -ForegroundColor Yellow
-    Write-Host "  1. 安裝 Python: https://www.python.org/downloads/" -ForegroundColor Green
-    Write-Host "  2. 安裝時勾選 'Add Python to PATH'" -ForegroundColor Green
+    Write-Host "Solution:" -ForegroundColor Yellow
+    Write-Host "  1. Install Python: https://www.python.org/downloads/" -ForegroundColor Green
+    Write-Host "  2. Check 'Add Python to PATH' during installation" -ForegroundColor Green
     Write-Host ""
-    Write-Host "安裝完成後，請重新執行此命令" -ForegroundColor Cyan
+    Write-Host "After installation, please run this command again" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "按任意鍵退出..." -ForegroundColor Gray
     try {
@@ -230,7 +249,7 @@ try {
     }
     
 } catch {
-    Write-Error "❌ 讀取數據庫失敗: $_"
+    Write-Error "[X] Failed to read database: $_"
     Write-Host ""
     Write-Host "按任意鍵退出..." -ForegroundColor Gray
     try {
@@ -243,14 +262,14 @@ try {
 
 # 顯示統計數據
 Write-Host ""
-Write-Host "📅 日期: $($Stats.date)" -ForegroundColor Cyan
-Write-Host "   戰鬥次數: $($Stats.battle_count)"
-Write-Host "   獲取聲骸: $($Stats.phantom_get_count)"
-Write-Host "   閃避成功: $($Stats.parry_count)"
-Write-Host "   切換角色: $($Stats.role_change_count)"
-Write-Host "   角色死亡: $($Stats.role_death_count)"
-Write-Host "   傳送次數: $($Stats.transfer_count)"
-Write-Host "   消耗體力: $($Stats.used_strength)"
+Write-Host "[*] Date: $($Stats.date)" -ForegroundColor Cyan
+Write-Host "   Battle Count: $($Stats.battle_count)"
+Write-Host "   Phantom Get: $($Stats.phantom_get_count)"
+Write-Host "   Parry Success: $($Stats.parry_count)"
+Write-Host "   Role Change: $($Stats.role_change_count)"
+Write-Host "   Role Death: $($Stats.role_death_count)"
+Write-Host "   Transfer: $($Stats.transfer_count)"
+Write-Host "   Used Strength: $($Stats.used_strength)"
 Write-Host ""
 
 # 檢查是否有數據
@@ -258,12 +277,12 @@ $TotalEvents = $Stats.battle_count + $Stats.phantom_get_count + $Stats.parry_cou
                $Stats.role_change_count + $Stats.role_death_count + $Stats.transfer_count
 
 if ($TotalEvents -eq 0) {
-    Write-Warning "⚠️  警告: 該日期沒有統計數據"
-    $Response = Read-Host "是否仍要上傳？(y/N)"
+    Write-Warning "[!] Warning: No statistics data for this date"
+    $Response = Read-Host "Still upload? (y/N)"
     if ($Response -ne "y" -and $Response -ne "Y") {
-        Write-Host "已取消上傳"
+        Write-Host "Upload cancelled"
         Write-Host ""
-        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        Write-Host "Press any key to exit..." -ForegroundColor Gray
         try {
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         } catch {
@@ -274,7 +293,7 @@ if ($TotalEvents -eq 0) {
 }
 
 # 上傳數據
-Write-Info "📤 正在上傳數據到 API..."
+Write-Info "[*] Uploading data to API..."
 
 try {
     $Payload = @{
@@ -291,29 +310,29 @@ try {
     
     if ($Response.success) {
         Write-Host ""
-        Write-Success "✅ 數據上傳成功！"
+        Write-Success "[OK] Data uploaded successfully!"
         Write-Host ""
-        Write-Host "🎉 完成！現在可以在 Discord 使用 /遊戲統計 查看數據" -ForegroundColor Green
+        Write-Host "[OK] Done! You can now use /game_stats in Discord to view the data" -ForegroundColor Green
         Write-Host ""
         
         # 如果不是在交互式終端，暫停讓用戶看到結果
         if (-not [Environment]::UserInteractive) {
-            Write-Host "按任意鍵退出..." -ForegroundColor Gray
+            Write-Host "Press any key to exit..." -ForegroundColor Gray
             $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         }
         exit 0
     } else {
-        Write-Error "❌ 上傳失敗: $($Response.msg)"
+        Write-Error "[X] Upload failed: $($Response.msg)"
         
         # 暫停讓用戶看到錯誤
         Write-Host ""
-        Write-Host "按任意鍵退出..." -ForegroundColor Gray
+        Write-Host "Press any key to exit..." -ForegroundColor Gray
         $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         exit 1
     }
     
 } catch {
-    Write-Error "❌ 上傳失敗: $_"
+    Write-Error "[X] Upload failed: $_"
     if ($_.Exception.Response) {
         try {
             $Reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
