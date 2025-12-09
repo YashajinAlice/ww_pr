@@ -81,16 +81,18 @@ if (-not $Uid) {
     }
 }
 
-# 獲取遊戲根目錄
-Write-Info "[*] Please enter your game root directory"
+# 獲取 WutheringWavesTool 安裝目錄
+Write-Info "[*] Please enter WutheringWavesTool installation directory"
 Write-Host ""
-Write-Host "Example: C:\Program Files\Wuthering Waves" -ForegroundColor Gray
-Write-Host "         D:\Games\Wuthering Waves" -ForegroundColor Gray
+Write-Host "Example: C:\Users\YourName\Desktop\WutheringWavesTool-1.3.3" -ForegroundColor Gray
+Write-Host "         D:\Tools\WutheringWavesTool" -ForegroundColor Gray
 Write-Host ""
-$GameRootDir = Read-Host "Game Root Directory"
+Write-Host "Note: This is where WutheringWavesTool.exe is located" -ForegroundColor Yellow
+Write-Host ""
+$ToolDir = Read-Host "WutheringWavesTool Directory"
 
-if (-not $GameRootDir) {
-    Write-Error "[X] Game root directory cannot be empty"
+if (-not $ToolDir) {
+    Write-Error "[X] Directory cannot be empty"
     Write-Host ""
     Write-Host "Press any key to exit..." -ForegroundColor Gray
     try {
@@ -102,8 +104,8 @@ if (-not $GameRootDir) {
 }
 
 # 檢查路徑是否存在
-if (-not (Test-Path $GameRootDir)) {
-    Write-Error "[X] Directory not found: $GameRootDir"
+if (-not (Test-Path $ToolDir)) {
+    Write-Error "[X] Directory not found: $ToolDir"
     Write-Host ""
     Write-Host "Press any key to exit..." -ForegroundColor Gray
     try {
@@ -114,17 +116,16 @@ if (-not (Test-Path $GameRootDir)) {
     exit 1
 }
 
-# 構建數據庫路徑
-$GameDbRelativePath = "Client\Saved\LocalStorage\LocalStorage.db"
-$DbPath = Join-Path $GameRootDir $GameDbRelativePath
+# 構建數據庫路徑（WutheringWavesTool 的 sqlite.db）
+$DbPath = Join-Path $ToolDir "sqlite.db"
 
 # 檢查數據庫文件是否存在
 if (-not (Test-Path $DbPath)) {
-    Write-Error "[X] Game database not found at: $DbPath"
+    Write-Error "[X] Database not found at: $DbPath"
     Write-Host ""
     Write-Host "Please confirm:" -ForegroundColor Yellow
-    Write-Host "  1. The game root directory is correct" -ForegroundColor White
-    Write-Host "  2. You have launched the game using WutheringWavesTool" -ForegroundColor White
+    Write-Host "  1. The WutheringWavesTool directory is correct" -ForegroundColor White
+    Write-Host "  2. You have launched the game using WutheringWavesTool at least once" -ForegroundColor White
     Write-Host ""
     Write-Host "Press any key to exit..." -ForegroundColor Gray
     try {
