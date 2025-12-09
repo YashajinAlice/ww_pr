@@ -1,11 +1,11 @@
 # WutheringWaves Bot - 遊戲統計數據一鍵導入腳本
 # 完全自包含，無需下載任何文件
 # 
-# 使用方法（一行命令）：
-#   iwr -UseBasicParsing https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/scripts/import.ps1 | iex -Token "YOUR_TOKEN" -Uid "YOUR_UID"
+# 使用方法（一行命令，無需下載）：
+#   $env:WW_BOT_TOKEN="YOUR_TOKEN"; $env:WW_BOT_UID="YOUR_UID"; iwr -UseBasicParsing https://raw.githubusercontent.com/YashajinAlice/ww_pr/main/scripts/import.ps1 | iex
 #
 # 或交互式輸入：
-#   iwr -UseBasicParsing https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/scripts/import.ps1 | iex
+#   iwr -UseBasicParsing https://raw.githubusercontent.com/YashajinAlice/ww_pr/main/scripts/import.ps1 | iex
 #
 # 首次使用可能需要執行：
 #   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -35,7 +35,16 @@ Write-Host "  WutheringWaves Bot - 遊戲統計導入" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 如果缺少參數，引導用戶輸入
+# 如果缺少參數，嘗試從環境變數讀取
+if (-not $Token) {
+    $Token = $env:WW_BOT_TOKEN
+}
+
+if (-not $Uid) {
+    $Uid = $env:WW_BOT_UID
+}
+
+# 如果還是沒有，引導用戶輸入
 if (-not $Token) {
     Write-Host "📝 請在 Discord 使用 /生成上傳令牌 獲取 Token" -ForegroundColor Yellow
     Write-Host ""
