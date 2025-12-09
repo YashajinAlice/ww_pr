@@ -81,53 +81,57 @@ if (-not $Uid) {
     }
 }
 
-# 查找遊戲數據庫
-Write-Info "[*] Searching for game database..."
+# 獲取遊戲根目錄
+Write-Info "[*] Please enter your game root directory"
+Write-Host ""
+Write-Host "Example: C:\Program Files\Wuthering Waves" -ForegroundColor Gray
+Write-Host "         D:\Games\Wuthering Waves" -ForegroundColor Gray
+Write-Host ""
+$GameRootDir = Read-Host "Game Root Directory"
 
-$GameDbRelativePath = "Client\Saved\LocalStorage\LocalStorage.db"
-$DbPath = $null
-
-# 嘗試常見路徑
-$CommonPaths = @(
-    "$env:LOCALAPPDATA\Wuthering Waves",
-    "C:\Program Files\Wuthering Waves",
-    "C:\Program Files (x86)\Wuthering Waves",
-    "D:\Wuthering Waves",
-    "E:\Wuthering Waves",
-    "F:\Wuthering Waves"
-)
-
-foreach ($BasePath in $CommonPaths) {
-    # 檢查磁碟機是否存在（避免不存在的磁碟機報錯）
-    $DriveLetter = ($BasePath -split ':')[0]
-    if ($DriveLetter -and $DriveLetter.Length -eq 1) {
-        $Drive = Get-PSDrive -Name $DriveLetter -ErrorAction SilentlyContinue
-        if (-not $Drive) {
-            # 磁碟機不存在，跳過
-            continue
-        }
+if (-not $GameRootDir) {
+    Write-Error "[X] Game root directory cannot be empty"
+    Write-Host ""
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        Start-Sleep -Seconds 3
     }
-    
-    # 檢查路徑是否存在
-    if (-not (Test-Path $BasePath)) {
-        continue
-    }
-    
-    $TestPath = Join-Path $BasePath $GameDbRelativePath
-    if (Test-Path $TestPath) {
-        $DbPath = $TestPath
-        break
-    }
+    exit 1
 }
 
-if (-not $DbPath) {
-    Write-Error "[X] Game database not found"
+# 檢查路徑是否存在
+if (-not (Test-Path $GameRootDir)) {
+    Write-Error "[X] Directory not found: $GameRootDir"
+    Write-Host ""
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        Start-Sleep -Seconds 3
+    }
+    exit 1
+}
+
+# 構建數據庫路徑
+$GameDbRelativePath = "Client\Saved\LocalStorage\LocalStorage.db"
+$DbPath = Join-Path $GameRootDir $GameDbRelativePath
+
+# 檢查數據庫文件是否存在
+if (-not (Test-Path $DbPath)) {
+    Write-Error "[X] Game database not found at: $DbPath"
     Write-Host ""
     Write-Host "Please confirm:" -ForegroundColor Yellow
-    Write-Host "  1. WutheringWavesTool is installed" -ForegroundColor White
+    Write-Host "  1. The game root directory is correct" -ForegroundColor White
     Write-Host "  2. You have launched the game using WutheringWavesTool" -ForegroundColor White
     Write-Host ""
-    Write-Host "If the game is installed in a non-default location, please contact admin" -ForegroundColor Yellow
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        Start-Sleep -Seconds 5
+    }
     exit 1
 }
 
