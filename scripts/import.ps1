@@ -188,11 +188,8 @@ $keywords = @{
     "结束技能名称:" = "parry"  # Special handling for parry
 }
 
-# Regex patterns for parry (using escaped patterns)
-$parryFrontPattern = [regex]::new("结束技能名称:.*极限闪避前闪")
-$parryBackPattern = [regex]::new("结束技能名称:.*极限闪避后闪")
-
 # Process log files (sorted by modification time)
+# Note: Parry detection uses -match operator directly, no regex objects needed
 $SortedFiles = $LogFiles | Sort-Object LastWriteTime
 
 foreach ($LogFile in $SortedFiles) {
